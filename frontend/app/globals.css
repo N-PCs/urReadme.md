@@ -1,0 +1,95 @@
+@import "tailwindcss" source(none);
+@source "..";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-code-bg: var(--code-bg);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.16 0.015 280);
+  --foreground: oklch(0.97 0.005 280);
+  --card: oklch(0.20 0.018 280);
+  --card-foreground: oklch(0.97 0.005 280);
+  --popover: oklch(0.20 0.018 280);
+  --popover-foreground: oklch(0.97 0.005 280);
+  --primary: oklch(0.75 0.18 295);
+  --primary-foreground: oklch(0.15 0.02 280);
+  --secondary: oklch(0.25 0.02 280);
+  --secondary-foreground: oklch(0.97 0.005 280);
+  --muted: oklch(0.24 0.018 280);
+  --muted-foreground: oklch(0.65 0.02 280);
+  --accent: oklch(0.30 0.04 295);
+  --accent-foreground: oklch(0.97 0.005 280);
+  --destructive: oklch(0.6 0.22 25);
+  --destructive-foreground: oklch(0.97 0.005 280);
+  --border: oklch(0.28 0.02 280);
+  --input: oklch(0.22 0.018 280);
+  --ring: oklch(0.75 0.18 295);
+  --success: oklch(0.72 0.15 160);
+  --code-bg: oklch(0.13 0.012 280);
+}
+
+.dark {
+  --background: oklch(0.16 0.015 280);
+  --foreground: oklch(0.97 0.005 280);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  html, body { background-color: var(--color-background); color: var(--color-foreground); font-family: var(--font-display); }
+}
+
+/* Markdown preview GitHub-like styling */
+.md-preview { color: var(--foreground); line-height: 1.65; font-size: 0.95rem; }
+.md-preview h1, .md-preview h2 { border-bottom: 1px solid var(--border); padding-bottom: 0.3em; margin-top: 1.4em; margin-bottom: 0.8em; font-weight: 700; }
+.md-preview h1 { font-size: 1.9em; }
+.md-preview h2 { font-size: 1.5em; }
+.md-preview h3 { font-size: 1.2em; margin-top: 1.2em; margin-bottom: 0.6em; font-weight: 600; }
+.md-preview p { margin: 0.8em 0; }
+.md-preview a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
+.md-preview ul, .md-preview ol { padding-left: 1.6em; margin: 0.6em 0; }
+.md-preview li { margin: 0.25em 0; }
+.md-preview code { background: var(--code-bg); padding: 0.15em 0.4em; border-radius: 4px; font-family: var(--font-mono); font-size: 0.88em; }
+.md-preview pre { background: var(--code-bg); padding: 1em; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border); }
+.md-preview pre code { background: transparent; padding: 0; font-size: 0.85em; }
+.md-preview blockquote { border-left: 3px solid var(--primary); padding: 0.2em 1em; color: var(--muted-foreground); margin: 0.8em 0; }
+.md-preview table { border-collapse: collapse; margin: 1em 0; }
+.md-preview th, .md-preview td { border: 1px solid var(--border); padding: 0.5em 0.9em; }
+.md-preview th { background: var(--muted); }
+.md-preview hr { border: none; border-top: 1px solid var(--border); margin: 1.5em 0; }
+.md-preview img { max-width: 100%; border-radius: 6px; }
+
+.hero-glow {
+  background: radial-gradient(ellipse 80% 50% at 50% 0%, color-mix(in oklch, var(--primary) 25%, transparent), transparent 70%);
+}

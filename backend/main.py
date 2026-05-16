@@ -142,46 +142,16 @@ async def generate_readme_endpoint(body: GenerateRequest):
             },
         )
 
-    # ------ Check for OpenAI key ------
-    if not os.getenv("OPENAI_API_KEY"):
-        return JSONResponse(
-            status_code=500,
-            content={
-                "detail": (
-                    "OPENAI_API_KEY is not configured. "
-                    "Please set it in your environment variables."
-                ),
-            },
-        )
-
-    # ------ Stream mode ------
-    if body.stream:
-        async def event_stream():
-            try:
-                async for token in generate_readme_stream(analysis):
-                    # SSE format
-                    yield f"data: {token}\n\n"
-                yield "data: [DONE]\n\n"
-            except Exception as exc:
-                yield f"data: [ERROR] {exc}\n\n"
-
-        return StreamingResponse(
-            event_stream(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "X-Accel-Buffering": "no",
-            },
-        )
-
     # ------ Non-streaming mode ------
     try:
-        readme = await generate_readme(analysis)
+        # Since our custom generate_readme is sync, we run it directly
+        # or use run_in_threadpool if it's heavy.
+        readme = generate_readme(analysis)
     except Exception as exc:
         traceback.print_exc()
         return JSONResponse(
             status_code=500,
-            content={"detail": f"LLM generation failed: {exc}"},
+            content={"detail": f"Custom AI generation failed: {exc}"},
         )
 
     return GenerateResponse(

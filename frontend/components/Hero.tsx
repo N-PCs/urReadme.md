@@ -51,7 +51,7 @@ export function Hero({ url, setUrl, onGenerate, loading }: HeroProps) {
         </form>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-xs font-medium text-muted-foreground">
-          <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-primary" /> Powered by GPT-4o</span>
+          <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-primary" /> Custom LLM Powered</span>
           <span className="flex items-center gap-1.5"><GitBranch className="h-3.5 w-3.5 text-primary" /> Public Repo Support</span>
           <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-primary" /> Privacy First</span>
         </div>

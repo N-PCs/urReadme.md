@@ -4,9 +4,7 @@ export async function GET() {
   return NextResponse.json({
     status: "ok",
     version: "2.0.0",
-    services: {
-      github: !!process.env.GITHUB_TOKEN,
-      openai: !!process.env.OPENAI_API_KEY,
-    },
+    backend: process.env.BACKEND_URL || "http://127.0.0.1:8000",
+    github_auth: !!process.env.GITHUB_TOKEN,
   })
 }

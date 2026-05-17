@@ -24,7 +24,6 @@ Your frontend is now **Vercel-ready**! Here are the critical issues that were re
    - Documented all required variables:
      - `BACKEND_URL` - Your FastAPI backend URL
      - `GITHUB_TOKEN` - GitHub API access
-     - `OPENAI_API_KEY` - Optional, if using OpenAI
 
 ### 5. **Next.js Optimizations** ✓
    - Enhanced `next.config.mjs` for Vercel
@@ -102,9 +101,6 @@ The URL where your FastAPI backend is deployed.
 ### `GITHUB_TOKEN` (Required for repo analysis)
 A GitHub Personal Access Token with repo read access.
 Get one at: https://github.com/settings/tokens
-
-### `OPENAI_API_KEY` (Optional)
-Only needed if your backend uses OpenAI models for README generation.
 
 ---
 

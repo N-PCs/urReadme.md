@@ -19,7 +19,6 @@ BACKEND_URL=https://api.example.com          # URL of your FastAPI backend
 GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxx          # GitHub API token for repo access
 
 # Optional
-OPENAI_API_KEY=sk-xxxxxxxxxxxxxxx           # OpenAI API key (if using OpenAI models)
 NEXT_PUBLIC_VERCEL_ANALYTICS_ID=xxxxx       # Vercel Analytics ID
 ```
 

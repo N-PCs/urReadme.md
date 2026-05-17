@@ -32,7 +32,6 @@ import { generate } from "urreadme";
 
 const readme = await generate({
   repo: "github.com/username/repository",
-  model: "gpt-4o",
 });
 
 console.log(readme);

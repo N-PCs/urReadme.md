@@ -1,12 +1,4 @@
 import { NextRequest, NextResponse } from "next/server"
-import {
-  analyzeRepo,
-  GitHubError,
-} from "@/lib/github-service"
-import {
-  generateReadme,
-  generateReadmeStream,
-} from "@/lib/llm-service"
 import { SAMPLE_README } from "@/lib/sample-readme"
 
 export const maxDuration = 60

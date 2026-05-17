@@ -17,11 +17,6 @@
       "key": "GITHUB_TOKEN",
       "description": "GitHub API token for accessing repository information",
       "value": ""
-    },
-    {
-      "key": "OPENAI_API_KEY",
-      "description": "OpenAI API key (if using OpenAI models in the backend)",
-      "value": ""
     }
   ]
 }

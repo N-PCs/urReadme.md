@@ -2,7 +2,6 @@
 const nextConfig = {
   typescript: {
     // Strict type checking
-    strict: true,
   },
   images: {
     unoptimized: true,
@@ -10,7 +9,6 @@ const nextConfig = {
   // Vercel-specific optimizations
   compress: true,
   productionBrowserSourceMaps: false,
-  swcMinify: true,
   reactStrictMode: true,
   httpAgentOptions: {
     keepAlive: true,

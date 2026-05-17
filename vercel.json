@@ -3,20 +3,7 @@
   "name": "urreadme-frontend",
   "buildCommand": "cd frontend && npm run build",
   "devCommand": "cd frontend && npm run dev",
-  "installCommand": "npm install",
+  "installCommand": "cd frontend && npm install --legacy-peer-deps",
   "outputDirectory": "frontend/.next",
-  "framework": "nextjs",
-  "public": true,
-  "env": [
-    {
-      "key": "BACKEND_URL",
-      "description": "URL of the FastAPI backend service (e.g., http://localhost:8000 for local, or https://api.example.com for production)",
-      "value": ""
-    },
-    {
-      "key": "GITHUB_TOKEN",
-      "description": "GitHub API token for accessing repository information",
-      "value": ""
-    }
-  ]
+  "framework": "nextjs"
 }

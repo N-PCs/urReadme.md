@@ -4,7 +4,7 @@ import { Terminal, Settings, LogOut, Github } from "lucide-react";
 import { signIn, signOut, useSession } from "next-auth/react";
 
 export function Navbar() {
-  const { data: session } = useSession();
+  const { data: session } = useSession() ?? {};
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">

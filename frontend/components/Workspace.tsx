@@ -1,17 +1,19 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Copy, Check, FileText, Pencil, Eye, Download, RefreshCw } from "lucide-react";
+import { Copy, Check, FileText, Pencil, Eye, Download, RefreshCw, Loader2 } from "lucide-react";
 
 interface WorkspaceProps {
   markdown: string;
   setMarkdown: (v: string) => void;
   onReset: () => void;
+  isGenerating?: boolean;
+  error?: string | null;
 }
 
 type Tab = "raw" | "edit";
 
-export function Workspace({ markdown, setMarkdown, onReset }: WorkspaceProps) {
+export function Workspace({ markdown, setMarkdown, onReset, isGenerating = false, error = null }: WorkspaceProps) {
   const [tab, setTab] = useState<Tab>("raw");
   const [copied, setCopied] = useState(false);
 
@@ -34,7 +36,11 @@ export function Workspace({ markdown, setMarkdown, onReset }: WorkspaceProps) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-xl font-bold">Your README</h2>
-          <p className="text-sm text-muted-foreground">Generated successfully — edit, copy, or download.</p>
+          <p className="text-sm text-muted-foreground">
+            {isGenerating
+              ? "Generating with Gemini — this may take a moment…"
+              : "Generated successfully — edit, copy, or download."}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={download} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition hover:bg-secondary">
@@ -45,6 +51,19 @@ export function Workspace({ markdown, setMarkdown, onReset }: WorkspaceProps) {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      {isGenerating && !markdown && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          Analyzing repository and generating README…
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Left: Editor */}

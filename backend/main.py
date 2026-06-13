@@ -11,6 +11,7 @@ strips the ``routePrefix`` before forwarding to this service.
 from __future__ import annotations
 
 import os
+import json
 import traceback
 
 import fastapi
@@ -75,6 +76,11 @@ class GenerateRequest(BaseModel):
         examples=["https://github.com/vercel/next.js"],
         description="Full GitHub repository URL (https or shorthand).",
     )
+    gemini_api_key: str = Field(
+        ...,
+        min_length=10,
+        description="User-provided Google Gemini API key for README generation.",
+    )
     stream: bool = Field(
         default=False,
         description="If true, stream the README as text/event-stream.",
@@ -123,9 +129,16 @@ async def generate_readme_endpoint(body: GenerateRequest):
 
     1. Parses the provided ``repo_url``.
     2. Fetches repo metadata, file tree, and key files via the GitHub API.
-    3. Constructs a dense prompt and sends it to the configured LLM.
+    3. Constructs a dense prompt and sends it to Gemini using the user's API key.
     4. Returns the generated README Markdown (or streams it).
     """
+    api_key = body.gemini_api_key.strip()
+    if not api_key:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Gemini API key is required."},
+        )
+
     github_token = os.getenv("GITHUB_TOKEN")
 
     # ------ Analyze the repository ------
@@ -142,16 +155,27 @@ async def generate_readme_endpoint(body: GenerateRequest):
             },
         )
 
+    # ------ Streaming mode ------
+    if body.stream:
+        async def event_stream():
+            try:
+                async for chunk in generate_readme_stream(analysis, api_key):
+                    yield f"data: {json.dumps(chunk)}\n\n"
+                yield "data: [DONE]\n\n"
+            except Exception as exc:
+                traceback.print_exc()
+                yield f"data: [ERROR]{exc}\n\n"
+
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
+
     # ------ Non-streaming mode ------
     try:
-        # Since our custom generate_readme is sync, we run it directly
-        # or use run_in_threadpool if it's heavy.
-        readme = generate_readme(analysis)
+        readme = generate_readme(analysis, api_key)
     except Exception as exc:
         traceback.print_exc()
         return JSONResponse(
             status_code=500,
-            content={"detail": f"Custom AI generation failed: {exc}"},
+            content={"detail": f"Gemini generation failed: {exc}"},
         )
 
     return GenerateResponse(

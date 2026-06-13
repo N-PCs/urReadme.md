@@ -1,42 +1,65 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { Navbar } from "@/components/Navbar"
 import { Hero } from "@/components/Hero"
 import { Features } from "@/components/Features"
 import { CtaBanner } from "@/components/CtaBanner"
 import { Footer } from "@/components/Footer"
 import { Workspace } from "@/components/Workspace"
-import { SAMPLE_README } from "@/lib/sample-readme"
+import { getGeminiApiKey, setGeminiApiKey } from "@/lib/gemini-storage"
 
 type View = "landing" | "workspace"
 
 export default function Home() {
   const [view, setView] = useState<View>("landing")
   const [repoUrl, setRepoUrl] = useState("")
+  const [apiKey, setApiKey] = useState("")
   const [markdown, setMarkdown] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
+  useEffect(() => {
+    const stored = getGeminiApiKey()
+    if (stored) setApiKey(stored)
+  }, [])
+
+  const handleApiKeyChange = useCallback((key: string) => {
+    setApiKey(key)
+    if (key.trim()) {
+      setGeminiApiKey(key)
+    }
+  }, [])
+
   const handleGenerate = useCallback(async () => {
     if (!repoUrl.trim()) return
+
+    const trimmedKey = apiKey.trim()
+    if (trimmedKey.length < 10) {
+      setError("Please enter your Gemini API key before generating.")
+      return
+    }
+
+    setGeminiApiKey(trimmedKey)
     setIsGenerating(true)
     setView("workspace")
     setMarkdown("")
     setError(null)
 
-    // Cancel any in-flight request
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
 
     try {
-      // ---- Try real backend (SSE streaming) ----
       const resp = await fetch("/api/generate-readme", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repo_url: repoUrl, stream: true }),
+        body: JSON.stringify({
+          repo_url: repoUrl,
+          gemini_api_key: trimmedKey,
+          stream: true,
+        }),
         signal: controller.signal,
       })
 
@@ -49,28 +72,34 @@ export default function Home() {
         resp.headers.get("content-type")?.includes("text/event-stream") &&
         resp.body
       ) {
-        // SSE streaming path
         const reader = resp.body.getReader()
         const decoder = new TextDecoder()
         let accumulated = ""
+        let buffer = ""
 
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
 
-          const chunk = decoder.decode(value, { stream: true })
-          const lines = chunk.split("\n")
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split("\n")
+          buffer = lines.pop() ?? ""
 
           for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6)
-              if (data === "[DONE]") break
-              if (data.startsWith("[ERROR]")) {
-                throw new Error(data.slice(8))
-              }
-              accumulated += data
-              setMarkdown(accumulated)
+            if (!line.startsWith("data: ")) continue
+
+            const data = line.slice(6)
+            if (data === "[DONE]") break
+            if (data.startsWith("[ERROR]")) {
+              throw new Error(data.slice(8))
             }
+
+            try {
+              accumulated += JSON.parse(data) as string
+            } catch {
+              accumulated += data
+            }
+            setMarkdown(accumulated)
           }
         }
 
@@ -78,34 +107,18 @@ export default function Home() {
         return
       }
 
-      // Non-streaming JSON response
       const data = await resp.json()
       setMarkdown(data.readme)
       setIsGenerating(false)
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === "AbortError") return
 
-      // ---- Fallback to mock data ----
-      console.warn(
-        "[urReadme] Backend unavailable, falling back to mock data:",
-        err,
-      )
-      setError(null) // clear error since we're using fallback
-      const lines = SAMPLE_README.split("\n")
-      let currentLine = 0
-
-      const interval = setInterval(() => {
-        currentLine += 1
-        if (currentLine >= lines.length) {
-          clearInterval(interval)
-          setMarkdown(SAMPLE_README)
-          setIsGenerating(false)
-          return
-        }
-        setMarkdown(lines.slice(0, currentLine + 1).join("\n"))
-      }, 60)
+      const message =
+        err instanceof Error ? err.message : "Failed to generate README."
+      setError(message)
+      setIsGenerating(false)
     }
-  }, [repoUrl])
+  }, [repoUrl, apiKey])
 
   const handleReset = useCallback(() => {
     setView("landing")
@@ -125,9 +138,16 @@ export default function Home() {
             <Hero
               url={repoUrl}
               setUrl={setRepoUrl}
+              apiKey={apiKey}
+              setApiKey={handleApiKeyChange}
               onGenerate={handleGenerate}
               loading={isGenerating}
             />
+            {error && (
+              <div className="mx-auto -mt-8 mb-4 max-w-2xl rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
             <Features />
             <CtaBanner />
           </>
@@ -136,6 +156,8 @@ export default function Home() {
             markdown={markdown}
             setMarkdown={setMarkdown}
             onReset={handleReset}
+            isGenerating={isGenerating}
+            error={error}
           />
         )}
       </main>

@@ -1,136 +1,116 @@
-"""Custom AI model for README generation.
-
-This service uses a combination of structural analysis and a local transformer 
-model (FLAN-T5) to generate comprehensive READMEs without external APIs.
-"""
+"""Gemini-powered README generation service."""
 
 from __future__ import annotations
 
 import logging
-from typing import Any
-from transformers import pipeline
-import torch
+from typing import AsyncIterator
+
+import google.generativeai as genai
+from google.api_core import exceptions as google_exceptions
+
 from .github_service import RepoAnalysis
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global model cache
-_model = None
+GEMINI_MODEL = "gemini-1.5-flash"
 
-def get_model():
-    """Lazy-load the transformer model."""
-    global _model
-    if _model is None:
-        logger.info("Loading custom AI model (google/flan-t5-small)...")
-        # Use a small model that can run on CPU/Render
-        try:
-            _model = pipeline(
-                "text2text-generation", 
-                model="google/flan-t5-small",
-                device=-1 # Force CPU
-            )
-            logger.info("Model loaded successfully.")
-        except Exception as e:
-            logger.error(f"Failed to load model: {e}")
-            _model = None
-    return _model
 
-def _generate_text(prompt: str, max_length: int = 150) -> str:
-    """Generate text using the local model with a fallback."""
-    model = get_model()
-    if not model:
-        return "Analysis-based description generation failed. Falling back to template logic."
-    
-    try:
-        result = model(prompt, max_length=max_length, do_sample=True, temperature=0.7)
-        return result[0]['generated_text']
-    except Exception as e:
-        logger.error(f"Generation error: {e}")
-        return "Error during text generation."
-
-def generate_readme(analysis: RepoAnalysis) -> str:
-    """Generate a full README.md using custom AI logic."""
+def _build_prompt(analysis: RepoAnalysis) -> str:
+    """Build a dense prompt from repository analysis data."""
     meta = analysis.meta
-    
-    # 1. Introduction & Theory
-    intro_prompt = f"Write a professional introduction and 'Why use this?' theory section for {meta.name}. Description: {meta.description or 'A software project'}."
-    introduction = _generate_text(intro_prompt, max_length=200)
-    
-    # 2. Tech Stack & Features
-    tech_stack = []
-    if meta.language:
-        tech_stack.append(meta.language)
-    
-    key_files_list = list(analysis.key_files.keys())
-    if "package.json" in key_files_list:
-        tech_stack.append("Node.js")
-    if "requirements.txt" in key_files_list or "pyproject.toml" in key_files_list:
-        tech_stack.append("Python")
-    if "Dockerfile" in key_files_list:
-        tech_stack.append("Docker")
-    
-    features_prompt = f"List 4 powerful features for a project with these files: {', '.join(analysis.tree[:15])}."
-    features = _generate_text(features_prompt, max_length=200)
-    
-    # 3. Project Structure (Tree)
-    # We use the actual tree fetched from GitHub
-    tree_str = "\n".join([f"├── {f}" for f in analysis.tree[:20]])
-    if len(analysis.tree) > 20:
-        tree_str += f"\n└── ... ({len(analysis.tree) - 20} more files)"
+    key_files = list(analysis.key_files.keys())
+    tree_preview = "\n".join(f"  - {path}" for path in analysis.tree[:40])
+    if len(analysis.tree) > 40:
+        tree_preview += f"\n  - ... ({len(analysis.tree) - 40} more files)"
 
-    # 4. Installation & Local Setup
-    if "package.json" in key_files_list:
-        setup_logic = "```bash\ngit clone https://github.com/{full_name}.git\ncd {name}\nnpm install\nnpm run dev\n```".format(full_name=meta.full_name, name=meta.name)
-    elif "requirements.txt" in key_files_list:
-        setup_logic = "```bash\ngit clone https://github.com/{full_name}.git\ncd {name}\npip install -r requirements.txt\npython main.py\n```".format(full_name=meta.full_name, name=meta.name)
-    else:
-        setup_logic = "```bash\ngit clone https://github.com/{full_name}.git\ncd {name}\n# Follow project-specific setup steps\n```".format(full_name=meta.full_name, name=meta.name)
-        
-    # 5. License & Authors
-    license_info = analysis.license_name or "MIT"
+    key_file_snippets = ""
+    for name, content in list(analysis.key_files.items())[:6]:
+        snippet = content[:2000]
+        key_file_snippets += f"\n### {name}\n```\n{snippet}\n```\n"
 
-    # Assemble the README
-    readme = f"""# {meta.name}
+    return f"""You are an expert technical writer. Generate a comprehensive, production-ready README.md for this GitHub repository.
 
-> {meta.description or "A modern software repository analysis tool."}
+Repository: {meta.full_name}
+Owner: {meta.owner}
+Description: {meta.description or "No description provided"}
+Primary language: {meta.language or "Unknown"}
+Stars: {meta.stars}
+Forks: {meta.forks}
+Topics: {", ".join(meta.topics) if meta.topics else "None"}
+License: {analysis.license_name or "Not detected"}
+Default branch: {meta.default_branch}
 
-## 📖 Introduction & Theory
-{introduction}
+File tree (sample):
+{tree_preview}
 
-## 🚀 Key Features
-{features}
+Key configuration files found: {", ".join(key_files) if key_files else "None"}
 
-## 🛠️ Tech Stack
-{', '.join(tech_stack) if tech_stack else 'Detected from codebase'}
+Key file contents:
+{key_file_snippets or "No key files available."}
 
-## 📂 Implementation / Project Structure
-```text
-.
-{tree_str}
-```
+Requirements:
+- Output ONLY valid Markdown (no code fences wrapping the entire README).
+- Include: title, badge-style metadata line, introduction, features, tech stack, project structure (ASCII tree), prerequisites, installation/setup, usage, contributing (brief), authors, license.
+- Infer setup commands from detected files (package.json → npm, requirements.txt → pip, etc.).
+- Use the actual repo name, owner, and detected license.
+- Be specific to this repository — avoid generic filler.
+- Use clear headings and emoji sparingly for section headers.
+- Keep it professional and developer-friendly."""
 
-## ⚙️ How to Run Locally
-### Prerequisites
-- Ensure you have the required runtime ({meta.language or 'environment'}) installed.
-- Git for cloning the repository.
 
-### Setup Steps
-{setup_logic}
+def _extract_text(response) -> str:
+    """Extract text from a Gemini response, raising on blocked/empty output."""
+    if not response.candidates:
+        raise ValueError("Gemini returned no candidates. The response may have been blocked.")
 
-## 👥 Authors
-- **{meta.owner}** - *Initial work* - [{meta.owner}](https://github.com/{meta.owner})
+    candidate = response.candidates[0]
+    if not candidate.content or not candidate.content.parts:
+        raise ValueError("Gemini returned an empty response.")
 
-## 📄 License
-This project is licensed under the **{license_info}** License - see the [LICENSE](LICENSE) file for details.
-"""
-    return readme
+    return "".join(part.text for part in candidate.content.parts if part.text)
 
-async def generate_readme_stream(analysis: RepoAnalysis):
-    """Simulate streaming for the custom AI model."""
-    readme = generate_readme(analysis)
-    # Since local generation is relatively fast, we just yield chunks
-    chunk_size = 50
-    for i in range(0, len(readme), chunk_size):
-        yield readme[i:i+chunk_size]
+
+def _handle_gemini_error(exc: Exception) -> None:
+    """Translate Gemini API errors into user-friendly messages."""
+    if isinstance(exc, google_exceptions.InvalidArgument):
+        raise ValueError("Invalid Gemini API key. Please check your key and try again.") from exc
+    if isinstance(exc, google_exceptions.PermissionDenied):
+        raise ValueError("Gemini API key denied. Ensure your key is valid and has API access enabled.") from exc
+    if isinstance(exc, google_exceptions.ResourceExhausted):
+        raise ValueError("Gemini API rate limit exceeded. Please wait and try again.") from exc
+    if isinstance(exc, google_exceptions.Unauthenticated):
+        raise ValueError("Gemini API authentication failed. Please verify your API key.") from exc
+    raise exc
+
+
+def generate_readme(analysis: RepoAnalysis, api_key: str) -> str:
+    """Generate a full README.md using the Gemini API."""
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(GEMINI_MODEL)
+    prompt = _build_prompt(analysis)
+
+    try:
+        response = model.generate_content(prompt)
+        return _extract_text(response).strip()
+    except Exception as exc:
+        logger.error("Gemini generation failed: %s", exc)
+        _handle_gemini_error(exc)
+        raise
+
+
+async def generate_readme_stream(analysis: RepoAnalysis, api_key: str) -> AsyncIterator[str]:
+    """Stream README generation chunks from Gemini."""
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(GEMINI_MODEL)
+    prompt = _build_prompt(analysis)
+
+    try:
+        response = model.generate_content(prompt, stream=True)
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
+    except Exception as exc:
+        logger.error("Gemini streaming failed: %s", exc)
+        _handle_gemini_error(exc)
+        raise
